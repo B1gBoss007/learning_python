@@ -1,0 +1,81 @@
+# -*- coding: utf-8 -*-
+
+import time
+import itchat
+import tushare as ts
+import pandas as pd
+
+USER = 'filehelper'
+
+STOCKS = {
+    "600019": [8.100, 10.000, 0.435],
+    "603868": [51.000, 60.000, 0.653],
+    "000333": [51.000, 100.000, 0],
+    "000651": [46.000, 100.000, 0],
+    "600398": [12.000, 15.000, 0.007],
+    "600887": [30.000, 35.000, 0]
+}
+
+class stockReminder:
+    def __init__(self):
+        pass
+
+    def data_realtime_quotes(self, stocks):
+        data = ts.get_realtime_quotes(stocks)
+        data.set_index(["code"], inplace=True)
+        data = data.loc[:,["name", "price"]]
+        return data
+
+    def monitor(self, STOCKS, sendmessage=False):
+        df = self.data_realtime_quotes(STOCKS.keys())
+
+        price = df["price"]
+        name = df["name"]
+        messageall = ""
+
+        monitor = []
+        buy = []
+
+        for i in STOCKS.keys():
+            buy.append(STOCKS[i][2])
+
+            if float(price[i]) <= float(STOCKS[i][0]):
+                message = "%s now is %s, low than %s" % (name[i], price[i], STOCKS[i][0])
+                monitor.append("low")
+                messageall = messageall + message
+
+            elif float(price[i]) >= float(STOCKS[i][1]):
+                monitor.append("high")
+                message = "%s now is %s, high than %s" % (name[i], price[i], STOCKS[i][1])
+                messageall = messageall + message
+            else:
+                monitor.append("nomal")
+
+        if sendmessage:
+            # hotReload用于保持登陆状态，避免每次都需要扫码验证
+            itchat.auto_login(hotReload=True)
+            x = itchat.send(messageall, USER)
+            if x["BaseResponse"]["Ret"] != 0:
+                raise Exception(x)
+
+        df["monitor"] = pd.Series(monitor, index=STOCKS.keys())
+        df["buy"] = pd.Series(buy, index=STOCKS.keys())
+
+        print df
+
+
+    def getInfos(self,stocks):
+        while True:
+            try:
+                print "==============================="
+                self.monitor(stocks)
+                time.sleep(30)
+            except:
+                print "Over!"
+
+if __name__ == "__main__":
+
+    x = stockReminder()
+    x.monitor(STOCKS)
+
+    # print pd.DataFrame(STOCKS, index=pd.Index(["low","high","buy"], name="id")).T
